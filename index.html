@@ -2,129 +2,82 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Full Multi-System Web Emulator</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Emulator (Working)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
 <style>
-body{margin:0;font-family:monospace;background:black;color:#00ff88;display:flex;flex-direction:column;min-height:100vh;}
-header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #004433;}
-header h1{margin:0;font-size:1.2rem;}
-button,select,input{background:black;color:#00ff88;border:1px solid #004433;padding:6px 8px;font-family:monospace;margin-right:8px;}
-button:hover,select:hover,input:hover{background:#00ff88;color:black;cursor:pointer;}
-main{flex:1;display:flex;flex-direction:column;align-items:center;padding:16px;}
-#game{width:95%;max-width:960px;height:70vh;border:2px solid #00ff88;margin-top:16px;background:black;display:flex;justify-content:center;align-items:center;}
-footer{padding:6px;text-align:center;font-size:.75rem;opacity:.6;}
+  body {
+    margin: 0;
+    background: black;
+    color: #0f0;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #controls {
+    margin: 12px;
+  }
+  select, input, button {
+    padding: 8px;
+    margin: 4px;
+    background: #000;
+    color: #0f0;
+    border: 1px solid #0f0;
+  }
+  #game {
+    width: 800px;
+    height: 600px;
+    border: 2px solid #0f0;
+    background: black;
+    margin-top: 12px;
+  }
 </style>
 </head>
 <body>
-<header>
-<h1>Full Multi-System Web Emulator</h1>
-<button id="installBtn" hidden>Install App</button>
-</header>
 
-<main>
-<div>
-<input type="file" id="rom">
-<select id="system">
-<option value="">Select system</option>
-<option value="nes">NES</option>
-<option value="snes">SNES</option>
-<option value="gb">GB / GBC</option>
-<option value="gba">GBA</option>
-<option value="sms">Sega Master System</option>
-<option value="genesis">Genesis / Mega Drive</option>
-<option value="gamegear">Game Gear</option>
-<option value="psx">PlayStation 1</option>
-</select>
-<button id="startBtn">Start</button>
+<h2>Web Emulator (Powered by EmulatorJS)</h2>
+
+<div id="controls">
+  <input type="file" id="romPicker" accept=".nes,.sfc,.smc,.gb,.gbc,.gba,.bin,.iso">
+  <select id="system">
+    <option value="">Select System</option>
+    <option value="nes">NES</option>
+    <option value="snes">SNES</option>
+    <option value="gba">GBA</option>
+    <option value="gb">Game Boy / Game Boy Color</option>
+    <option value="genesis">Genesis / Mega Drive</option>
+    <option value="sms">Sega Master System</option>
+    <option value="gamegear">Game Gear</option>
+    <option value="psx">PlayStation</option>
+  </select>
+  <button id="startBtn">Start Game</button>
 </div>
 
-<div id="game">Load a ROM and select a system to start...</div>
-</main>
-
-<footer>
-Client-side multi-system emulator • User-provided ROMs only
-</footer>
+<div id="game"></div>
 
 <script>
-// PWA support
-let deferredPrompt;
-const installBtn=document.getElementById("installBtn");
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;installBtn.hidden=false});
-installBtn.onclick=()=>{deferredPrompt.prompt();deferredPrompt=null;installBtn.hidden=true;};
+document.getElementById("startBtn").onclick = () => {
+  const romFile = document.getElementById("romPicker").files[0];
+  const sys = document.getElementById("system").value;
+  if (!romFile || !sys) return alert("Choose a ROM and system.");
 
-// Core JS/WASM URLs
-const cores={
-  nes:"https://cdn.jsdelivr.net/gh/bfirsh/jsnes@master/dist/jsnes.min.js",
-  snes:"https://cdn.jsdelivr.net/gh/snes9x-wasm/snes9x-wasm@latest/snes9x.min.js",
-  gb:"https://cdn.jsdelivr.net/gh/gbe-project/gbe@master/dist/gbc.js",
-  gba:"https://cdn.jsdelivr.net/gh/torch2424/gba.js@latest/gba.js",
-  sms:"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/sms.js",
-  genesis:"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/genesis.js",
-  gamegear:"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/gamegear.js",
-  psx:"https://cdn.jsdelivr.net/gh/mist64/playstation1js@latest/psx.js"
-};
+  // Prepare EmulatorJS
+  window.EJS_player = "#game";
+  window.EJS_core = sys;
+  window.EJS_gameUrl = URL.createObjectURL(romFile);
+  window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+  window.EJS_startOnLoaded = true;
 
-function loadCore(url,callback){
-  const existing=document.getElementById("coreScript");
-  if(existing) existing.remove();
-  const script=document.createElement("script");
-  script.src=url; script.id="coreScript"; script.onload=callback;
-  document.body.appendChild(script);
-}
+  // Optional: set BIOS URLs if needed
+  window.EJS_biosUrl = "";
 
-// NES keyboard mapping
-const keyMap={
-ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
-z:'A',x:'B',a:'L',s:'R',Enter:'START',Shift:'SELECT'
-};
-
-document.getElementById("startBtn").onclick=async()=>{
-  const romFile=document.getElementById("rom").files[0];
-  const system=document.getElementById("system").value;
-  if(!romFile||!system){alert("Select ROM and system.");return;}
-  const gameDiv=document.getElementById("game");
-  gameDiv.innerHTML="Loading emulator core...";
-
-  loadCore(cores[system],()=>{
-    gameDiv.innerHTML="";
-    const canvas=document.createElement("canvas");
-    canvas.width=256; canvas.height=240;
-    gameDiv.appendChild(canvas);
-    const ctx=canvas.getContext("2d");
-
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const romData=new Uint8Array(e.target.result);
-
-      if(system==="nes"){
-        // NES fully playable
-        const nes=new window.NES({
-          onFrame:frame=>{const img=ctx.createImageData(256,240);img.data.set(frame);ctx.putImageData(img,0,0);},
-          onAudioSample:()=>{}
-        });
-        nes.loadROM(romData); nes.start();
-        window.addEventListener('keydown',ev=>{if(keyMap[ev.key])nes.buttonDown(1,keyMap[ev.key]);});
-        window.addEventListener('keyup',ev=>{if(keyMap[ev.key])nes.buttonUp(1,keyMap[ev.key]);});
-      } 
-      else if(system==="snes"){
-        gameDiv.innerHTML="SNES WASM core loaded. Drag and drop ROM in console panel (full init required).";
-      } 
-      else if(system==="gba"){
-        gameDiv.innerHTML="GBA WASM core loaded. ROM execution available via WASM init.";
-      } 
-      else if(system==="gb"){
-        gameDiv.innerHTML="GB/GBC WASM core loaded. ROM execution available via WASM init.";
-      } 
-      else if(system==="sms"||system==="genesis"||system==="gamegear"){
-        gameDiv.innerHTML="Genesis/SMS/Game Gear WASM core loaded. ROM execution available via WASM init.";
-      } 
-      else if(system==="psx"){
-        gameDiv.innerHTML="PS1 WASM core loaded. BIOS required for execution.";
-      }
-    }
-    reader.readAsArrayBuffer(romFile);
-  });
+  // Load the emulator
+  const s = document.createElement("script");
+  s.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+  document.body.appendChild(s);
 };
 </script>
+
 </body>
 </html>
