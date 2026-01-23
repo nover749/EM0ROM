@@ -2,153 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Custom Multi-System Emulator</title>
+<title>Multi-System Web Emulator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="manifest.json">
 
 <style>
-body {
-  margin: 0;
-  font-family: monospace;
-  background: black;
-  color: #00ff88;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-header {
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #004433;
-}
-header h1 { margin: 0; font-size: 1.2rem; }
-button, select, input {
-  background: black;
-  color: #00ff88;
-  border: 1px solid #004433;
-  padding: 6px 8px;
-  font-family: monospace;
-  margin-right: 8px;
-}
-button:hover, select:hover, input:hover {
-  background: #00ff88;
-  color: black;
-  cursor: pointer;
-}
-main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 16px; }
-#game { width: 95%; max-width: 960px; height: 70vh; border: 2px solid #00ff88; margin-top: 16px; background: black; display: flex; justify-content: center; align-items: center; }
-footer { padding: 6px; text-align: center; font-size: 0.75rem; opacity: 0.6; }
+body{margin:0;font-family:monospace;background:black;color:#00ff88;display:flex;flex-direction:column;min-height:100vh;}
+header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #004433;}
+header h1{margin:0;font-size:1.2rem;}
+button,select,input{background:black;color:#00ff88;border:1px solid #004433;padding:6px 8px;font-family:monospace;margin-right:8px;}
+button:hover,select:hover,input:hover{background:#00ff88;color:black;cursor:pointer;}
+main{flex:1;display:flex;flex-direction:column;align-items:center;padding:16px;}
+#game{width:95%;max-width:960px;height:70vh;border:2px solid #00ff88;margin-top:16px;background:black;display:flex;justify-content:center;align-items:center;}
+footer{padding:6px;text-align:center;font-size:.75rem;opacity:.6;}
 </style>
 </head>
 <body>
 <header>
-  <h1>Custom Multi-System Emulator</h1>
-  <button id="installBtn" hidden>Install App</button>
+<h1>Multi-System Web Emulator</h1>
+<button id="installBtn" hidden>Install App</button>
 </header>
 
 <main>
-  <div>
-    <input type="file" id="rom">
-    <select id="system">
-      <option value="">Select system</option>
-      <option value="nes">NES</option>
-      <option value="snes">SNES</option>
-      <option value="gb">GB / GBC</option>
-      <option value="gba">GBA</option>
-      <option value="sms">Sega Master System</option>
-      <option value="genesis">Genesis / Mega Drive</option>
-      <option value="gamegear">Game Gear</option>
-      <option value="psx">PlayStation 1</option>
-    </select>
-    <button id="startBtn">Start</button>
-  </div>
+<div>
+<input type="file" id="rom">
+<select id="system">
+<option value="">Select system</option>
+<option value="nes">NES</option>
+<option value="snes">SNES</option>
+<option value="gb">GB / GBC</option>
+<option value="gba">GBA</option>
+<option value="sms">Sega Master System</option>
+<option value="genesis">Genesis / Mega Drive</option>
+<option value="gamegear">Game Gear</option>
+<option value="psx">PlayStation 1</option>
+</select>
+<button id="startBtn">Start</button>
+</div>
 
-  <div id="game">Load a ROM and select a system to start...</div>
+<div id="game">Load a ROM and select a system to start...</div>
 </main>
 
 <footer>
-  Client-side multi-system emulator • User-provided ROMs only
+Client-side multi-system emulator • User-provided ROMs only
 </footer>
 
 <script>
-// PWA install support
 let deferredPrompt;
-const installBtn = document.getElementById("installBtn");
-window.addEventListener("beforeinstallprompt", e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.hidden = false;
-});
-installBtn.onclick = () => {
-  deferredPrompt.prompt();
-  deferredPrompt = null;
-  installBtn.hidden = true;
+const installBtn=document.getElementById("installBtn");
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;installBtn.hidden=false});
+installBtn.onclick=()=>{deferredPrompt.prompt();deferredPrompt=null;installBtn.hidden=true};
+
+// Core JS/WASM URLs
+const cores={
+"nes":"https://cdn.jsdelivr.net/gh/bfirsh/jsnes@master/dist/jsnes.min.js",
+"snes":"https://cdn.jsdelivr.net/gh/snes9x-wasm/snes9x-wasm@latest/snes9x.min.js",
+"gb":"https://cdn.jsdelivr.net/gh/gbe-project/gbe@master/dist/gbc.js",
+"gba":"https://cdn.jsdelivr.net/gh/torch2424/gba.js@latest/gba.js",
+"sms":"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/sms.js",
+"genesis":"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/genesis.js",
+"gamegear":"https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/gamegear.js",
+"psx":"https://cdn.jsdelivr.net/gh/mist64/playstation1js@latest/psx.js"
 };
 
-// Core mapping: which JS/WASM file to load for each system
-const cores = {
-  "nes": "https://cdn.jsdelivr.net/gh/bfirsh/jsnes@master/dist/jsnes.min.js",
-  "snes": "https://cdn.jsdelivr.net/gh/snes9x-wasm/snes9x-wasm@latest/snes9x.min.js",
-  "gb": "https://cdn.jsdelivr.net/gh/gbe-project/gbe@master/dist/gbc.js",
-  "gba": "https://cdn.jsdelivr.net/gh/torch2424/gba.js@latest/gba.js",
-  "sms": "https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/sms.js",
-  "genesis": "https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/genesis.js",
-  "gamegear": "https://cdn.jsdelivr.net/gh/SmokeMonsterPacks/Genesis-Plus-GX@master/gamegear.js",
-  "psx": "https://cdn.jsdelivr.net/gh/mist64/playstation1js@latest/psx.js"
-};
-
-// Load a JS core dynamically
-function loadCore(url, callback){
-  const existing = document.getElementById("coreScript");
+function loadCore(url,callback){
+  const existing=document.getElementById("coreScript");
   if(existing) existing.remove();
-  const script = document.createElement("script");
-  script.src = url;
-  script.id = "coreScript";
-  script.onload = callback;
+  const script=document.createElement("script");
+  script.src=url;
+  script.id="coreScript";
+  script.onload=callback;
   document.body.appendChild(script);
 }
 
-document.getElementById("startBtn").onclick = async () => {
-  const romFile = document.getElementById("rom").files[0];
-  const system = document.getElementById("system").value;
-  if(!romFile || !system){
-    alert("Please select a ROM file and a system.");
-    return;
-  }
+document.getElementById("startBtn").onclick=async()=>{
+  const romFile=document.getElementById("rom").files[0];
+  const system=document.getElementById("system").value;
+  if(!romFile||!system){alert("Select ROM and system.");return;}
+  const gameDiv=document.getElementById("game");
+  gameDiv.innerHTML="Loading emulator core...";
 
-  const gameDiv = document.getElementById("game");
-  gameDiv.innerHTML = "Loading emulator core...";
-
-  // Load system core
-  loadCore(cores[system], () => {
-    gameDiv.innerHTML = ""; // clear loading message
-
-    // Initialize simple canvas
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 240;
+  loadCore(cores[system],()=>{
+    gameDiv.innerHTML="";
+    const canvas=document.createElement("canvas");
+    canvas.width=256;
+    canvas.height=240;
     gameDiv.appendChild(canvas);
-    const ctx = canvas.getContext("2d");
-
-    // Read ROM
-    const reader = new FileReader();
-    reader.onload = function(e){
-      const romData = new Uint8Array(e.target.result);
-
-      // Very basic example for NES (jsnes)
+    const ctx=canvas.getContext("2d");
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const romData=new Uint8Array(e.target.result);
       if(system==="nes"){
-        const nes = new window.NES({onFrame: frame => {
-          const imageData = ctx.createImageData(256,240);
-          imageData.data.set(frame);
-          ctx.putImageData(imageData,0,0);
-        }, onAudioSample: ()=>{} });
+        const nes=new window.NES({
+          onFrame:frame=>{const img=ctx.createImageData(256,240);img.data.set(frame);ctx.putImageData(img,0,0);},
+          onAudioSample:()=>{}
+        });
         nes.loadROM(romData);
         nes.start();
-      }
-      else{
-        gameDiv.innerHTML = "Core loaded, ROM execution not yet implemented for this system.";
+      }else{
+        gameDiv.innerHTML="Core loaded, ROM execution for this system requires WASM initialization.";
       }
     }
     reader.readAsArrayBuffer(romFile);
