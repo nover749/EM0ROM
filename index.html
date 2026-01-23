@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <title>Multi-System Web Emulator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="manifest.json">
-
 <style>
 body{margin:0;font-family:monospace;background:black;color:#00ff88;display:flex;flex-direction:column;min-height:100vh;}
 header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #004433;}
@@ -51,9 +49,9 @@ Client-side multi-system emulator • User-provided ROMs only
 let deferredPrompt;
 const installBtn=document.getElementById("installBtn");
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;installBtn.hidden=false});
-installBtn.onclick=()=>{deferredPrompt.prompt();deferredPrompt=null;installBtn.hidden=true};
+installBtn.onclick=()=>{deferredPrompt.prompt();deferredPrompt=null;installBtn.hidden=true;};
 
-// Core JS/WASM URLs
+// Core URLs (JS/WASM)
 const cores={
 "nes":"https://cdn.jsdelivr.net/gh/bfirsh/jsnes@master/dist/jsnes.min.js",
 "snes":"https://cdn.jsdelivr.net/gh/snes9x-wasm/snes9x-wasm@latest/snes9x.min.js",
@@ -65,15 +63,20 @@ const cores={
 "psx":"https://cdn.jsdelivr.net/gh/mist64/playstation1js@latest/psx.js"
 };
 
+// Dynamic core loader
 function loadCore(url,callback){
   const existing=document.getElementById("coreScript");
   if(existing) existing.remove();
   const script=document.createElement("script");
-  script.src=url;
-  script.id="coreScript";
-  script.onload=callback;
+  script.src=url; script.id="coreScript"; script.onload=callback;
   document.body.appendChild(script);
 }
+
+// Key mapping for NES/SNES/GB/GBA (expand later)
+const keyMap = {
+  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
+  z:'A', x:'B', a:'L', s:'R', Enter:'START', Shift:'SELECT'
+};
 
 document.getElementById("startBtn").onclick=async()=>{
   const romFile=document.getElementById("rom").files[0];
@@ -85,22 +88,45 @@ document.getElementById("startBtn").onclick=async()=>{
   loadCore(cores[system],()=>{
     gameDiv.innerHTML="";
     const canvas=document.createElement("canvas");
-    canvas.width=256;
-    canvas.height=240;
+    canvas.width=256; canvas.height=240;
     gameDiv.appendChild(canvas);
     const ctx=canvas.getContext("2d");
     const reader=new FileReader();
     reader.onload=e=>{
       const romData=new Uint8Array(e.target.result);
+
+      // NES example
       if(system==="nes"){
         const nes=new window.NES({
-          onFrame:frame=>{const img=ctx.createImageData(256,240);img.data.set(frame);ctx.putImageData(img,0,0);},
+          onFrame:frame=>{
+            const img=ctx.createImageData(256,240); img.data.set(frame); ctx.putImageData(img,0,0);
+          },
           onAudioSample:()=>{}
         });
-        nes.loadROM(romData);
-        nes.start();
-      }else{
-        gameDiv.innerHTML="Core loaded, ROM execution for this system requires WASM initialization.";
+        nes.loadROM(romData); nes.start();
+
+        // keyboard input
+        window.addEventListener('keydown',ev=>{
+          if(keyMap[ev.key]) nes.buttonDown(1,keyMap[ev.key]);
+        });
+        window.addEventListener('keyup',ev=>{
+          if(keyMap[ev.key]) nes.buttonUp(1,keyMap[ev.key]);
+        });
+      }
+      else if(system==="snes"){
+        gameDiv.innerHTML="SNES core loaded. ROM execution requires WASM initialization.";
+      }
+      else if(system==="gba"){
+        gameDiv.innerHTML="GBA core loaded. ROM execution requires WASM initialization.";
+      }
+      else if(system==="gb"){
+        gameDiv.innerHTML="GB/GBC core loaded. ROM execution requires WASM initialization.";
+      }
+      else if(system==="sms"||system==="genesis"||system==="gamegear"){
+        gameDiv.innerHTML="Genesis/SMS/Game Gear core loaded. ROM execution requires WASM initialization.";
+      }
+      else if(system==="psx"){
+        gameDiv.innerHTML="PS1 core loaded. BIOS required for execution.";
       }
     }
     reader.readAsArrayBuffer(romFile);
